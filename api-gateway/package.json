@@ -1,0 +1,4 @@
+{
+  "name": "api-gateway", "type": "module", "scripts": { "start": "node src/server.js" },
+  "dependencies": { "express": "^4.21.2", "http-proxy-middleware": "^3.0.3", "jsonwebtoken": "^9.0.2" }
+}

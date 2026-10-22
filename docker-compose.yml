@@ -1,0 +1,143 @@
+name: course-microservices
+
+services:
+  consul:
+    image: hashicorp/consul:1.19
+    command: agent -dev -client=0.0.0.0 -config-dir=/consul/config
+    ports: ["8500:8500"]
+    volumes: ["./infra/consul:/consul/config:ro"]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports: ["15672:15672"]
+    environment:
+      RABBITMQ_DEFAULT_USER: course
+      RABBITMQ_DEFAULT_PASS: course
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  product-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: products
+      POSTGRES_USER: product
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-course-product-password}
+    volumes: ["product-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product -d products"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  customer-db:
+    image: mongo:7
+    volumes: ["customer-data:/data/db"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1})"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  order-db:
+    image: mysql:8.4
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: orders
+      MYSQL_USER: order
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-course-order-password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-course-root-password}
+    volumes: ["order-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pcourse-root-password"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  notification-db:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes: ["notification-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  product-service:
+    image: retailflow/product-service:latest
+    build: ./product-service
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://product:${POSTGRES_PASSWORD:-course-product-password}@product-db:5432/products
+    depends_on:
+      product-db: { condition: service_healthy }
+
+  customer-service:
+    image: retailflow/customer-service:latest
+    build: ./customer-service
+    environment:
+      MONGO_URL: mongodb://customer-db:27017
+    depends_on:
+      customer-db: { condition: service_healthy }
+
+  order-service:
+    image: retailflow/order-service:latest
+    build: ./order-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://order-db:3306/orders
+      SPRING_DATASOURCE_USERNAME: order
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-course-order-password}
+      RABBITMQ_HOST: rabbitmq
+      PRODUCT_GRPC_HOST: product-service
+    depends_on:
+      order-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      product-service: { condition: service_started }
+
+  billing-service:
+    image: retailflow/billing-service:latest
+    build: ./billing-service
+    environment:
+      RABBITMQ_URL: amqp://course:course@rabbitmq:5672/
+    volumes: ["billing-data:/data"]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  notification-service:
+    image: retailflow/notification-service:latest
+    build: ./notification-service
+    environment:
+      REDIS_CONNECTION: notification-db:6379
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      notification-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  api-gateway:
+    image: retailflow/api-gateway:latest
+    build: ./api-gateway
+    ports: ["8080:8080"]
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-course-demo-secret-change-me}
+      PRODUCT_URL: http://product-service:3001
+      CUSTOMER_URL: http://customer-service:8000
+      ORDER_URL: http://order-service:8083
+      BILLING_URL: http://billing-service:8084
+      NOTIFICATION_URL: http://notification-service:8085
+    depends_on: [product-service, customer-service, order-service, billing-service, notification-service]
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports: ["9090:9090"]
+    volumes: ["./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    depends_on: [api-gateway]
+
+volumes:
+  product-data:
+  customer-data:
+  order-data:
+  billing-data:
+  notification-data:

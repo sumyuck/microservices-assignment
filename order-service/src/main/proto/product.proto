@@ -1,0 +1,7 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "com.course.product.grpc";
+package product;
+service ProductStock { rpc CheckStock (StockRequest) returns (StockReply); }
+message StockRequest { int64 product_id = 1; int32 quantity = 2; }
+message StockReply { bool available = 1; string message = 2; }

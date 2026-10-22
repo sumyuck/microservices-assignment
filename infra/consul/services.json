@@ -1,0 +1,9 @@
+{
+  "services": [
+    {"name":"product-service","address":"product-service","port":3001,"check":{"http":"http://product-service:3001/health","interval":"10s"}},
+    {"name":"customer-service","address":"customer-service","port":8000,"check":{"http":"http://customer-service:8000/health","interval":"10s"}},
+    {"name":"order-service","address":"order-service","port":8083,"check":{"http":"http://order-service:8083/health","interval":"10s"}},
+    {"name":"billing-service","address":"billing-service","port":8084,"check":{"http":"http://billing-service:8084/health","interval":"10s"}},
+    {"name":"notification-service","address":"notification-service","port":8085,"check":{"http":"http://notification-service:8085/health","interval":"10s"}}
+  ]
+}
