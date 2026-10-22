@@ -40,7 +40,7 @@ Useful pages: gateway `http://localhost:8080`, Consul `http://localhost:8500`, R
 6. `GET /orders/{id}` immediately shows the CQRS read model. Within a few seconds, `GET /billing/invoices` and `GET /notifications` show the asynchronous results.
 7. Stop Product Service and create another order to demonstrate the circuit-breaker fallback.
 
-See [architecture notes](docs/architecture.md) and `infra/k8s/README.md` for the short presentation explanation and Kubernetes instructions.
+See [architecture notes](docs/architecture.md), the [friend's run guide](docs/RUN_GUIDE.md), and `infra/k8s/README.md` for the presentation explanation, local run steps, and Kubernetes instructions.
 
 ## Put this in a new GitHub repository
 
